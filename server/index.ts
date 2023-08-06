@@ -315,23 +315,24 @@ app.delete("/deleteCar", (req, res) => {
 /* MERCADO PAGO */
 
 app.post("/webhook/mercadopago", async (req, res) => {
-  const sourceApiUrl = req.headers['x-source-api-url'];
-  console.log("Webhook URL: ", sourceApiUrl);
   const { id, topic } = req.query;
-  Number(id);
-  console.log(
-    "SOY EL WEBHOOK/MERCADOPAGO ",
-    "req.body: ",
-    req.body,
-    "req.query: ",
-    req.query
-  );
-  if (topic == "merchant_order") {
-    const order = await getMerchantOrder(Number(id));
-    console.log({ order });
-    res.json({order})
+  try {
+    console.log(
+      "SOY EL WEBHOOK/MERCADOPAGO ",
+      "req.body: ",
+      req.body,
+      "req.query: ",
+      req.query
+    );
+    if (topic == "merchant_order") {
+      const order = await getMerchantOrder(Number(id));
+      console.log({ order });
+      res.json({ order });
+    }
+    res.send("ok");
+  } catch (err) {
+    console.error(err);
   }
-  res.send("ok");
 });
 
 app.get("/getOrderStatus/:userId/:");
