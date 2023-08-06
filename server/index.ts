@@ -323,7 +323,7 @@ app.post("/create_preference", (req, res) => {
       pending: "http://localhost:3000/parking",
     },
     external_reference: req.body.userId,
-    notification_url: "http://localhost:8080/webhook/mercadopago",
+    notification_url: "https://estaciona-chivilcoy.onrender.com/webhook/mercadopago",
     auto_return: "approved",
   };
   mercadopago.preferences
