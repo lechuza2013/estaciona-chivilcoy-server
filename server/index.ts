@@ -3,8 +3,7 @@ import * as express from "express";
 import * as bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
 import * as cors from "cors";
-import { getMerchantOrder } from "./db";
-import mercadopago from "mercadopago";
+import { getMerchantOrder, mercadopago } from "./db";
 
 const app = express();
 const PORT = 8080;
