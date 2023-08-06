@@ -1,6 +1,5 @@
 // CONEXIÓN A LA DATABASE
 import admin from "firebase-admin";
-import * as serviceAccount from "../key.json";
 import mercadopago from "mercadopago";
 
 admin.initializeApp({
