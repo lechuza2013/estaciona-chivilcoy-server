@@ -4,8 +4,8 @@ import admin from "firebase-admin";
 import mercadopago from "mercadopago";
 
 admin.initializeApp({
-  credential: admin.credential.cert(JSON.parse(SERVICE_ACCOUNT)),
-  databaseURL: FIREBASE_DB_URL,
+  credential: admin.credential.cert(JSON.parse(process.env.SERVICE_ACCOUNT)),
+  databaseURL: process.env.FIREBASE_DB_URL,
 });
 
 const firestoreDB = admin.firestore();
@@ -14,7 +14,7 @@ const realtimeDB = admin.database();
 export { firestoreDB, realtimeDB };
 
 mercadopago.configure({
-  access_token: ACCESS_TOKEN,
+  access_token: process.env.ACCESS_TOKEN,
 });
 
 export async function getMerchantOrder(id) {
