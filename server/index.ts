@@ -26,10 +26,6 @@ app.use((req, res, next) => {
 
 const platesCollectionRef = firestoreDB.collection("carPlate");
 
-mercadopago.configure({
-  access_token: process.env.ACCESS_TOKEN,
-});
-
 function getExpiredCarIds(objetos) {
   const currentDate = new Date();
 
