@@ -5,7 +5,6 @@
     "module": "CommonJS",
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
   },
   "files": ["server/index.ts"]
 }
