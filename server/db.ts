@@ -4,8 +4,8 @@ import admin from "firebase-admin";
 import mercadopago from "mercadopago";
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount as any),
-  databaseURL: "https://estaciona-chivilcoy-37816-default-rtdb.firebaseio.com",
+  credential: admin.credential.cert(JSON.parse(SERVICE_ACCOUNT)),
+  databaseURL: FIREBASE_DB_URL,
 });
 
 const firestoreDB = admin.firestore();
@@ -14,8 +14,7 @@ const realtimeDB = admin.database();
 export { firestoreDB, realtimeDB };
 
 mercadopago.configure({
-  access_token:
-    "TEST-2039711323530302-072700-102a314cf2e5d98a9a91f5c25c49f643-1102603889",
+  access_token: ACCESS_TOKEN,
 });
 
 export async function getMerchantOrder(id) {
