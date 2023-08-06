@@ -18,8 +18,12 @@ mercadopago.configure({
 });
 
 export async function getMerchantOrder(id) {
-  console.log("Soy la function getMerchantOrder(id)");
-  const res = await mercadopago.merchant_orders.get(id);
+  console.log("Soy la function getMerchantOrder", id);
+  try {
+    const res = await mercadopago.merchant_orders.get(id);
 
-  return res.body.order_status;
+    return res.body.order_status;
+  } catch (err) {
+    return err;
+  }
 }
