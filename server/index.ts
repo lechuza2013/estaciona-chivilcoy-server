@@ -4,6 +4,7 @@ import * as bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
 import * as cors from "cors";
 import { getMerchantOrder } from "./db";
+// import fetch from "node-fetch";
 
 const app = express();
 const PORT = 8080;
@@ -37,6 +38,28 @@ function getExpiredCarIds(objetos) {
 
   if (expiredCarIds.length > 0) {
     expiredCarIds.forEach((carId) => {
+      const userId = objetos[carId].userId;
+      const realCarId = objetos[carId].carId;
+      console.log("UserID: ", userId, "carId: ", carId);
+      const userCarIdRef = realtimeDB.ref("users/" + userId + "/cars/");
+      userCarIdRef.get().then((snap) => {
+        var snapData = snap.val();
+        snapData[realCarId].isParked = false;
+        userCarIdRef.update(snapData);
+        console.log({ snapData });
+      });
+      // realtimeDB
+      //     .ref(`/users/${userId}/cars/${carId}/isParked`)
+      //     .set(false)
+      //     .then(() => {
+      //       console.log(`'isParked' property of car with ID ${carId} set to false.`);
+
+      //     })
+      //     .catch((error) => {
+      //       console.error(
+      //         `Error setting 'isParked' property of car with ID ${carId}: ${error.message}`
+      //       );
+      //     });
       realtimeDB
         .ref(`/parkedCars/${carId}`)
         .remove()
@@ -58,7 +81,7 @@ function getExpiredCarIds(objetos) {
     let data = snap.val();
     //Para que no aparezca el prueba: 1 que esta en al database
     delete data.prueba;
-
+    console.log(data);
     const intervalId = setInterval(() => {
       getExpiredCarIds(data);
     }, 30000);
@@ -319,7 +342,7 @@ app.delete("/deleteCar", (req, res) => {
 /* MERCADO PAGO */
 
 app.post("/webhook/mercadopago", async (req, res) => {
- const { id, topic } = req.query;
+  const { id, topic } = req.query;
   try {
     console.log(
       "SOY EL WEBHOOK/MERCADOPAGO ",
@@ -338,26 +361,7 @@ app.post("/webhook/mercadopago", async (req, res) => {
     res.status(500).send("Internal Server Error"); // Manejar errores y enviar una respuesta de error
   }
 });
-/*
-app.get("/getOrderStatus/:userId/:access_token", (req, res) => {
-  const { userId, access_token } = req.params;
-  console.log(userId, access_token);
-  if (!userId || !access_token) {
-    res.status(400).send({ message: "Faltan datos en el query params" });
-  } else {
-    fetch("https://api.mercadopago.com/merchant_orders/" + userId, {
-      method: "GET",
-      headers: { Authorization: "Bearer " + access_token },
-    })
-      .then((res) => {
-        return res.json();
-      })
-      .then((data) => {
-        console.log({ data });
-      });
-  }
-});
-*/
+
 app.get("/", function (req, res) {
   res.send("el servidor de estaciona chivilcoy funciona!");
 });
