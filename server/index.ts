@@ -317,6 +317,7 @@ app.delete("/deleteCar", (req, res) => {
 /* MERCADO PAGO */
 
 app.post("/create_preference", (req, res) => {
+  console.log("req.body: ", req.body, "req.query: ", req.query);
   let preference = {
     items: [
       {
@@ -349,6 +350,7 @@ app.post("/create_preference", (req, res) => {
 
 app.post("/webhook/mercadopago", async (req, res) => {
   const { id, topic } = req.query;
+  console.log("req.body: ", req.body, "req.query: ", req.query);
   if (topic == "merchant_order") {
     const order = await getMerchantOrder(id);
     console.log("Order webhook:", order);
