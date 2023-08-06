@@ -118,45 +118,49 @@ app.get("/getUserData/:userId", async (req, res) => {
 //Cuando va a estacionar el auto, ingresa sus datos y luego se agregan a a "/Parkedcars"
 app.post("/parkCar", (req, res) => {
   const { coordinates, carId, userId, time, plate } = req.body;
-  // Crea una date nueva y le setea los minutos que recibió, para posteriormente guardarlos en la RTDB Como string
-  const currentTime = new Date();
-  const expirationTime = new Date(currentTime.getTime() + time * 60000);
+  if (!coordinates || !carId || !userId || !time || !plate) {
+    res.status(400).send({ message: "Faltan datos en el body" });
+  } else {
+    // Crea una date nueva y le setea los minutos que recibió, para posteriormente guardarlos en la RTDB Como string
+    const currentTime = new Date();
+    const expirationTime = new Date(currentTime.getTime() + time * 60000);
 
-  let carData;
-  //Trae todo de la RTDB
-  const rtdbData = realtimeDB.ref("/");
-  rtdbData
-    .get()
-    .then((snap) => {
-      const allData = snap.val();
-      //Busca la info del auto para guardarlas en el string declarado anteriormente
-      carData = allData.users[userId].cars[carId];
+    let carData;
+    //Trae todo de la RTDB
+    const rtdbData = realtimeDB.ref("/");
+    rtdbData
+      .get()
+      .then((snap) => {
+        const allData = snap.val();
+        //Busca la info del auto para guardarlas en el string declarado anteriormente
+        carData = allData.users[userId].cars[carId];
 
-      // Update the 'isParked' property to true in the user's car entry
-      realtimeDB.ref(`/users/${userId}/cars/${carId}`).update({
-        isParked: true,
-      });
+        // Update the 'isParked' property to true in the user's car entry
+        realtimeDB.ref(`/users/${userId}/cars/${carId}`).update({
+          isParked: true,
+        });
 
-      //Setea en "/parkedCars", los siguientes datos
-      return realtimeDB.ref("/parkedCars/" + uuidv4()).set({
-        carId: carId,
-        coordinates: coordinates,
-        userId: userId,
-        name: carData.name,
-        expirationTime: expirationTime.toString(),
-        plate: plate,
+        //Setea en "/parkedCars", los siguientes datos
+        return realtimeDB.ref("/parkedCars/" + uuidv4()).set({
+          carId: carId,
+          coordinates: coordinates,
+          userId: userId,
+          name: carData.name,
+          expirationTime: expirationTime.toString(),
+          plate: plate,
+        });
+      })
+      .then(() => {
+        res.json({
+          message: "Estacionado con éxito!",
+        });
+      })
+      .catch((error) => {
+        res.status(500).json({
+          error: "Error al estacionar el auto: " + error.message,
+        });
       });
-    })
-    .then(() => {
-      res.json({
-        message: "Estacionado con éxito!",
-      });
-    })
-    .catch((error) => {
-      res.status(500).json({
-        error: "Error al estacionar el auto: " + error.message,
-      });
-    });
+  }
 });
 /* app.post("/parkCar", (req, res) => {
   const { coordinates, carId, userId, time, plate } = req.body;
@@ -335,7 +339,23 @@ app.post("/webhook/mercadopago", async (req, res) => {
   }
 });
 
-app.get("/getOrderStatus/:userId/:");
+app.get("/getOrderStatus/:userId/:access_token", (req, res) => {
+  const { userId, access_token } = req.params;
+  if (!userId || !access_token) {
+    res.status(400).send({ message: "Faltan datos en el query params" });
+  } else {
+    fetch("https://api.mercadopago.com/merchant_orders/" + userId, {
+      method: "GET",
+      headers: { Authorization: "Bearer " + access_token },
+    })
+      .then((res) => {
+        return res.json();
+      })
+      .then((data) => {
+        console.log({ data });
+      });
+  }
+});
 app.get("/", function (req, res) {
   res.send("el servidor de estaciona chivilcoy funciona!");
 });
