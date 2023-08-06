@@ -315,7 +315,8 @@ app.delete("/deleteCar", (req, res) => {
 /* MERCADO PAGO */
 
 app.post("/webhook/mercadopago", async (req, res) => {
-  
+  const sourceApiUrl = req.headers['x-source-api-url'];
+  console.log("Webhook URL: ", sourceApiUrl);
   const { id, topic } = req.query;
   Number(id);
   console.log(
