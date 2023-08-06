@@ -1,7 +1,7 @@
 // CONEXIÓN A LA DATABASE
-import admin from "firebase-admin";
+const admin = require("firebase-admin");
 // Mercadopago
-import mercadopago from "mercadopago";
+const mercadopago = require('mercadopago');
 
 admin.initializeApp({
   credential: admin.credential.cert(JSON.parse(process.env.SERVICE_ACCOUNT)),
