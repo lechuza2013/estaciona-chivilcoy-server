@@ -3,7 +3,7 @@ import admin from "firebase-admin";
 import mercadopago from "mercadopago";
 
 admin.initializeApp({
-  credential: admin.credential.cert(process.env.SERVICE_ACCCOUNT),
+  credential: admin.credential.cert(JSON.parse(process.env.SERVICE_ACCCOUNT)),
   databaseURL: process.env.FIREBASE_DB_URL,
 });
 
