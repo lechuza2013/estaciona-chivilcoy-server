@@ -327,6 +327,7 @@ app.post("/webhook/mercadopago", async (req, res) => {
   if (topic == "merchant_order") {
     const order = await getMerchantOrder(Number(id));
     console.log({ order });
+    res.json({order})
   }
   res.status(200).send("ok");
 });
