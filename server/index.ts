@@ -314,46 +314,6 @@ app.delete("/deleteCar", (req, res) => {
 
 /* MERCADO PAGO */
 
-app.post("/create_preference", (req, res) => {
-  console.log(
-    "SOY EL CREATE REFERENCE ",
-    "req.body: ",
-    req.body,
-    "req.query: ",
-    req.query
-  );
-  let preference = {
-    items: [
-      {
-        title: req.body.description,
-        unit_price: Number(req.body.price),
-        quantity: Number(req.body.quantity),
-      },
-    ],
-    back_urls: {
-      success: "https://estaciona-chivilcoy-j9mv.onrender.com",
-      failure: "https://estaciona-chivilcoy-j9mv.onrender.com",
-      pending: "https://estaciona-chivilcoy-j9mv.onrender.com",
-    },
-    external_reference: req.body.userId,
-    notification_url:
-      "https://estaciona-chivilcoy.onrender.com/webhook/mercadopago",
-    auto_return: "approved",
-  };
-
-  mercadopago.preferences
-    .create(preference)
-    .then(function (response) {
-      console.log("body Id :", response.body.id);
-      res.json({
-        id: response.body.id,
-      });
-    })
-    .catch(function (error) {
-      console.log(error);
-    });
-});
-
 app.post("/webhook/mercadopago", async (req, res) => {
   const { id, topic } = req.query;
   console.log(
@@ -364,6 +324,7 @@ app.post("/webhook/mercadopago", async (req, res) => {
     req.query
   );
   if (topic == "merchant_order") {
+    Number(id);
     const order = await getMerchantOrder(id);
     console.log("Order webhook:", order);
   }
