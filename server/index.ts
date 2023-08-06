@@ -341,6 +341,7 @@ app.post("/webhook/mercadopago", async (req, res) => {
 
 app.get("/getOrderStatus/:userId/:access_token", (req, res) => {
   const { userId, access_token } = req.params;
+  console.log(userId, access_token);
   if (!userId || !access_token) {
     res.status(400).send({ message: "Faltan datos en el query params" });
   } else {
