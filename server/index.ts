@@ -315,6 +315,8 @@ app.delete("/deleteCar", (req, res) => {
 /* MERCADO PAGO */
 
 app.post("/webhook/mercadopago", async (req, res) => {
+  const clientUrl = req.url;
+  console.log('URL del cliente:', clientUrl);
   const { id, topic } = req.query;
   Number(id);
   console.log(
