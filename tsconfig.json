@@ -4,7 +4,8 @@
     "moduleResolution": "node",
     "module": "CommonJS",
     "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
   },
   "files": ["server/index.ts"]
 }
