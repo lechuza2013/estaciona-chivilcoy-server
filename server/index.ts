@@ -319,7 +319,7 @@ app.delete("/deleteCar", (req, res) => {
 /* MERCADO PAGO */
 
 app.post("/webhook/mercadopago", async (req, res) => {
-  const { id, topic } = req.query;
+ const { id, topic } = req.query;
   try {
     console.log(
       "SOY EL WEBHOOK/MERCADOPAGO ",
@@ -328,8 +328,11 @@ app.post("/webhook/mercadopago", async (req, res) => {
       "req.query: ",
       req.query
     );
+    if (topic == "merchant_order") {
       const order = await getMerchantOrder(Number(id));
-      console.log({ order }); res.send("ok"); // Enviar respuesta "ok" si el topic no es "merchant_order"
+      console.log({ order });
+      res.send("ok"); // Enviar respuesta "ok" si el topic no es "merchant_order"
+    }
   } catch (err) {
     console.error(err);
     res.status(500).send("Internal Server Error"); // Manejar errores y enviar una respuesta de error
