@@ -4,16 +4,19 @@ import * as bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
 import * as cors from "cors";
 import { getMerchantOrder } from "./db";
+import mercadopago from "mercadopago";
 
 const app = express();
 const PORT = 8080;
 
-const mercadopago = require("mercadopago");
 app.use(express.json());
 app.use(cors());
 app.use(bodyParser.json());
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "https://estaciona-chivilcoy-j9mv.onrender.com");
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "https://estaciona-chivilcoy-j9mv.onrender.com"
+  );
   res.header(
     "Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept"
@@ -317,7 +320,13 @@ app.delete("/deleteCar", (req, res) => {
 /* MERCADO PAGO */
 
 app.post("/create_preference", (req, res) => {
-  console.log("SOY EL CREATE REFERENCE ","req.body: ", req.body, "req.query: ", req.query);
+  console.log(
+    "SOY EL CREATE REFERENCE ",
+    "req.body: ",
+    req.body,
+    "req.query: ",
+    req.query
+  );
   let preference = {
     items: [
       {
@@ -327,14 +336,16 @@ app.post("/create_preference", (req, res) => {
       },
     ],
     back_urls: {
-      success: "http://localhost:3000/parking",
-      failure: "http://localhost:3000/parking",
-      pending: "http://localhost:3000/parking",
+      success: "https://estaciona-chivilcoy-j9mv.onrender.com",
+      failure: "https://estaciona-chivilcoy-j9mv.onrender.com",
+      pending: "https://estaciona-chivilcoy-j9mv.onrender.com",
     },
     external_reference: req.body.userId,
-    notification_url: "https://estaciona-chivilcoy.onrender.com/webhook/mercadopago",
+    notification_url:
+      "https://estaciona-chivilcoy.onrender.com/webhook/mercadopago",
     auto_return: "approved",
   };
+
   mercadopago.preferences
     .create(preference)
     .then(function (response) {
@@ -350,7 +361,13 @@ app.post("/create_preference", (req, res) => {
 
 app.post("/webhook/mercadopago", async (req, res) => {
   const { id, topic } = req.query;
-  console.log("SOY EL WEBHOOK/MERCADOPAGO ", "req.body: ", req.body, "req.query: ", req.query);
+  console.log(
+    "SOY EL WEBHOOK/MERCADOPAGO ",
+    "req.body: ",
+    req.body,
+    "req.query: ",
+    req.query
+  );
   if (topic == "merchant_order") {
     const order = await getMerchantOrder(id);
     console.log("Order webhook:", order);
