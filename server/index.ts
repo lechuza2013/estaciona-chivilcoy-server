@@ -3,7 +3,7 @@ import * as express from "express";
 import * as bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
 import * as cors from "cors";
-import { getMerchantOrder, mercadopago } from "./db";
+import { getMerchantOrder } from "./db";
 
 const app = express();
 const PORT = 8080;
@@ -316,6 +316,7 @@ app.delete("/deleteCar", (req, res) => {
 
 app.post("/webhook/mercadopago", async (req, res) => {
   const { id, topic } = req.query;
+  Number(id);
   console.log(
     "SOY EL WEBHOOK/MERCADOPAGO ",
     "req.body: ",
@@ -324,13 +325,13 @@ app.post("/webhook/mercadopago", async (req, res) => {
     req.query
   );
   if (topic == "merchant_order") {
-    Number(id);
-    const order = await getMerchantOrder(id);
-    console.log("Order webhook:", order);
+    const order = await getMerchantOrder(Number(id));
+    console.log({ order });
   }
   res.status(200).send("ok");
 });
 
+app.get("/getOrderStatus/:userId/:");
 app.get("/", function (req, res) {
   res.send("el servidor de estaciona chivilcoy funciona!");
 });
