@@ -21,4 +21,7 @@
     "typescript": "^4.9.5",
     "uuid": "^9.0.0"
   }
+  "devDependencies": {
+    "@types/mercadopago": "^1.5.8"
+  }
 }
