@@ -328,13 +328,8 @@ app.post("/webhook/mercadopago", async (req, res) => {
       "req.query: ",
       req.query
     );
-    if (topic == "merchant_order") {
       const order = await getMerchantOrder(Number(id));
-      console.log({ order });
-      res.json({ order });
-    } else {
-      res.send("ok"); // Enviar respuesta "ok" si el topic no es "merchant_order"
-    }
+      console.log({ order }); res.send("ok"); // Enviar respuesta "ok" si el topic no es "merchant_order"
   } catch (err) {
     console.error(err);
     res.status(500).send("Internal Server Error"); // Manejar errores y enviar una respuesta de error
