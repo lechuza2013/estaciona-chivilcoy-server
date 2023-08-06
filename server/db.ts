@@ -21,5 +21,5 @@ export async function getMerchantOrder(id) {
   console.log("Soy la function getMerchantOrder(id)");
   const res = await mercadopago.merchant_orders.get(id);
 
-  console.log(res.body);
+  return res.body.order_status;
 }
