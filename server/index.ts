@@ -4,7 +4,6 @@ import * as bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
 import * as cors from "cors";
 import { getMerchantOrder } from "./db";
-import fetch from "node-fetch"
 
 const app = express();
 const PORT = 8080;
@@ -339,7 +338,7 @@ app.post("/webhook/mercadopago", async (req, res) => {
     console.error(err);
   }
 });
-
+/*
 app.get("/getOrderStatus/:userId/:access_token", (req, res) => {
   const { userId, access_token } = req.params;
   console.log(userId, access_token);
@@ -358,6 +357,7 @@ app.get("/getOrderStatus/:userId/:access_token", (req, res) => {
       });
   }
 });
+*/
 app.get("/", function (req, res) {
   res.send("el servidor de estaciona chivilcoy funciona!");
 });
