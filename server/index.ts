@@ -42,16 +42,31 @@ async function getExpiredCarIds(objetos) {
       const realCarId = objetos[carId].carId;
       const userCarIdRef = realtimeDB.ref("users/");
 
-      console.log("UserID: ", userId, "carId: ", carId);
+      console.log("UserID: ", userId, "carId: ", realCarId);
       try {
-        await realtimeDB.ref(`/parkedCars/${carId}`).remove();
+        await realtimeDB
+          .ref(`/parkedCars/${carId}`)
+          .remove()
+          .then(() => {
+            console.log("Auto removido");
+          });
         await userCarIdRef.get().then((currentSnap) => {
           var csData = currentSnap.val();
           console.log(csData);
-          csData[userId].cars[realCarId].isParked = false;
-          userCarIdRef.update(csData);
+          if (csData[userId].cars[realCarId].isParked === true) {
+            csData[userId].cars[realCarId].isParked = false;
+            userCarIdRef.update(csData);
+            console.log(
+              "isParked del auto :",
+              csData[userId].cars[realCarId].name,
+              "Seteado a 'false'"
+            );
+          } else if (csData[userId].cars[realCarId].isParked === false) {
+            console.log("isParked ya es false, chequear funcionamiento");
+          }
+          // csData[userId].cars[realCarId].isParked = false;
+          // userCarIdRef.update(csData);
         });
-        console.log("Auto removido y isParked seteado a false!");
       } catch (error) {
         console.error("Error al actualizar el estado del auto:", error);
       }
@@ -65,7 +80,6 @@ async function getExpiredCarIds(objetos) {
     let data = snap.val();
     //Para que no aparezca el prueba: 1 que esta en al database
     delete data.prueba;
-    console.log(data);
     const intervalId = setInterval(() => {
       getExpiredCarIds(data);
     }, 30000);
@@ -84,10 +98,11 @@ app.post("/addTime/:carId/:time", async (req, res) => {
     const parkedCarsRef = realtimeDB.ref("/parkedCars/");
     const snapshot = await parkedCarsRef.once("value");
     const parkedCarsData = snapshot.val();
-
+    console.log({ parkedCarsData });
     if (parkedCarsData) {
       // Buscar el objeto dentro de parkedCars que tenga el carId especificado
       for (const parkedCarId in parkedCarsData) {
+        console.log({ parkedCarId });
         if (
           parkedCarsData.hasOwnProperty(parkedCarId) &&
           parkedCarsData[parkedCarId].carId === carId
@@ -314,45 +329,113 @@ app.post("/createCar", (req, res) => {
   }
 });
 
-app.get("/parkedCars/:userId/:isOfficer?", (req, res) => {
+// app.get("/parkedCars/:userId/:isOfficer?", (req, res) => {
+//   const { userId, isOfficer } = req.params;
+//   let isOfficerBoolean;
+//   if (isOfficer == "false") {
+//     isOfficerBoolean = false;
+//   } else if (isOfficer == "true") {
+//     isOfficerBoolean = true;
+//   }
+//   console.log("/parkedCars recibió: ", req.params);
+//   const parkedCarsRef = realtimeDB.ref("parkedCars/");
+//   // Si isOfficer es true, devuelve todos los estacionados.
+//   if (isOfficerBoolean === true) {
+//     console.log("Officer true");
+//     parkedCarsRef.get().then((snap) => {
+//       if (snap.exists) {
+//         const snapData = snap.val();
+//         const objectsArray = Object.values(snapData);
+//         res.json(objectsArray);
+//       } else {
+//         res.json({ message: "No hay ningún auto estacionado" });
+//       }
+//     });
+//   }
+//   // Si es falso, devuelve solo el del userId
+//   else if (isOfficerBoolean === false) {
+//     console.log("Officer false");
+//     parkedCarsRef.get().then((snap) => {
+//       let snapData = snap.val();
+
+//       const snapDataValues = Object.values(snapData);
+//       const filteredData = snapDataValues.filter((data: any) => {
+//         return data.userId === userId;
+//       });
+//       /*  console.log({ filteredData }); */
+//       res.json(filteredData);
+//     });
+//   }
+// });
+app.get("/parkedCars/:userId/:isOfficer?", async (req, res) => {
   const { userId, isOfficer } = req.params;
   let isOfficerBoolean;
-  if (isOfficer == "false") {
+
+  if (isOfficer === "false") {
     isOfficerBoolean = false;
-  } else if (isOfficer == "true") {
+  } else if (isOfficer === "true") {
     isOfficerBoolean = true;
   }
-  console.log("/parkedCars recibió: ", req.params);
-  const parkedCarsRef = realtimeDB.ref("parkedCars/");
-  // Si isOfficer es true, devuelve todos los estacionados.
-  if (isOfficerBoolean === true) {
-    console.log("Officer true");
-    parkedCarsRef.get().then((snap) => {
-      if (snap.exists) {
-        const snapData = snap.val();
+
+  try {
+    console.log("/parkedCars recibió: ", req.params);
+
+    const parkedCarsRef = realtimeDB.ref("parkedCars/");
+    const snap = await parkedCarsRef.get();
+    const snapData = snap.val();
+
+    if (isOfficerBoolean === true) {
+      console.log("Officer true");
+      if (snap.exists()) {
         const objectsArray = Object.values(snapData);
-        res.json(objectsArray);
+
+        // Obtener datos adicionales de Firestore para cada placa
+        const enhancedDataPromises = objectsArray.map(async (data: any) => {
+          const plate = data.plate;
+          if (typeof plate === "string" && plate.trim() !== "") {
+            const plateDoc = await platesCollectionRef.doc(plate).get();
+            if (plateDoc.exists) {
+              const plateData = plateDoc.data();
+              return { ...data, ...plateData };
+            }
+          }
+          return data;
+        });
+
+        const enhancedData = await Promise.all(enhancedDataPromises);
+
+        res.json(enhancedData);
       } else {
         res.json({ message: "No hay ningún auto estacionado" });
       }
-    });
-  }
-  // Si es falso, devuelve solo el del userId
-  else if (isOfficerBoolean === false) {
-    console.log("Officer false");
-    parkedCarsRef.get().then((snap) => {
-      let snapData = snap.val();
-
-      const snapDataValues = Object.values(snapData);
-      const filteredData = snapDataValues.filter((data: any) => {
-        return data.userId === userId;
+    } else if (isOfficerBoolean === false) {
+      console.log("Officer false");
+      const filteredDataPromises = Object.keys(snapData).map(async (key) => {
+        const data = snapData[key];
+        if (typeof data === "object" && data.userId === userId) {
+          const plate = data.plate;
+          if (typeof plate === "string" && plate.trim() !== "") {
+            const plateDoc = await platesCollectionRef.doc(plate).get();
+            if (plateDoc.exists) {
+              const plateData = plateDoc.data();
+              return { ...data, ...plateData };
+            }
+          }
+        }
+        return null;
       });
-      /*  console.log({ filteredData }); */
+
+      const filteredData = (await Promise.all(filteredDataPromises)).filter(
+        (data) => data !== null
+      );
+
       res.json(filteredData);
-    });
+    }
+  } catch (error) {
+    console.error("Error retrieving data:", error);
+    res.status(500).send("Internal server error.");
   }
 });
-
 app.delete("/deleteCar", (req, res) => {
   const { userId, carId } = req.body;
   console.log("/deleteCar recibió: ", req.body);
