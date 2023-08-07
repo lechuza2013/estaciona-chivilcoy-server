@@ -26,7 +26,7 @@ app.use((req, res, next) => {
 
 const platesCollectionRef = firestoreDB.collection("carPlate");
 
-function getExpiredCarIds(objetos) {
+async function getExpiredCarIds(objetos) {
   const currentDate = new Date();
 
   const expiredCarIds = Object.keys(objetos).filter((key) => {
@@ -37,41 +37,25 @@ function getExpiredCarIds(objetos) {
   console.log(expiredCarIds);
 
   if (expiredCarIds.length > 0) {
-    expiredCarIds.forEach((carId) => {
+    for (const carId of expiredCarIds) {
       const userId = objetos[carId].userId;
       const realCarId = objetos[carId].carId;
-      console.log("UserID: ", userId, "carId: ", carId);
-      const userCarIdRef = realtimeDB.ref("users/" + userId + "/cars/");
-      userCarIdRef.get().then((snap) => {
-        var snapData = snap.val();
-        snapData[realCarId].isParked = false;
-        userCarIdRef.update(snapData);
-        console.log({ snapData });
-      });
-      // realtimeDB
-      //     .ref(`/users/${userId}/cars/${carId}/isParked`)
-      //     .set(false)
-      //     .then(() => {
-      //       console.log(`'isParked' property of car with ID ${carId} set to false.`);
+      const userCarIdRef = realtimeDB.ref("users/");
 
-      //     })
-      //     .catch((error) => {
-      //       console.error(
-      //         `Error setting 'isParked' property of car with ID ${carId}: ${error.message}`
-      //       );
-      //     });
-      realtimeDB
-        .ref(`/parkedCars/${carId}`)
-        .remove()
-        .then(() => {
-          console.log(`Car with ID ${carId} removed from the database.`);
-        })
-        .catch((error) => {
-          console.error(
-            `Error removing car with ID ${carId}: ${error.message}`
-          );
+      console.log("UserID: ", userId, "carId: ", carId);
+      try {
+        await realtimeDB.ref(`/parkedCars/${carId}`).remove();
+        await userCarIdRef.get().then((currentSnap) => {
+          var csData = currentSnap.val();
+          console.log(csData);
+          csData[userId].cars[realCarId].isParked = false;
+          userCarIdRef.update(csData);
         });
-    });
+        console.log("Auto removido y isParked seteado a false!");
+      } catch (error) {
+        console.error("Error al actualizar el estado del auto:", error);
+      }
+    }
   }
 }
 
@@ -88,8 +72,57 @@ function getExpiredCarIds(objetos) {
   });
 })();
 
-// Recibe Nombre y patente y devuelve un array de los autos
-// Recibe Nombre y patente y devuelve un array de los autos
+app.post("/addTime/:carId/:time", async (req, res) => {
+  // Recibe el carId para buscarlo en la RTDB, y al encontrarlo, extrae el expiration time y le agrega el tiempo agregado
+  const { carId, time } = req.params;
+
+  try {
+    // Convertir el tiempo recibido a minutos
+    const timeToAdd = parseInt(time);
+
+    // Obtener la referencia al objeto correspondiente en parkedCars
+    const parkedCarsRef = realtimeDB.ref("/parkedCars/");
+    const snapshot = await parkedCarsRef.once("value");
+    const parkedCarsData = snapshot.val();
+
+    if (parkedCarsData) {
+      // Buscar el objeto dentro de parkedCars que tenga el carId especificado
+      for (const parkedCarId in parkedCarsData) {
+        if (
+          parkedCarsData.hasOwnProperty(parkedCarId) &&
+          parkedCarsData[parkedCarId].carId === carId
+        ) {
+          const currentExpirationTime = new Date(
+            parkedCarsData[parkedCarId].expirationTime
+          );
+
+          // Calcular el nuevo expirationTime sumando el tiempo en minutos
+          const newExpirationTime = new Date(
+            currentExpirationTime.getTime() + timeToAdd * 60000
+          );
+
+          // Formatear la fecha en el formato deseado
+          const formattedExpirationTime = newExpirationTime.toString();
+
+          // Actualizar la propiedad expirationTime en la base de datos
+          await parkedCarsRef.child(parkedCarId).update({
+            expirationTime: formattedExpirationTime,
+          });
+
+          res.status(200).send("Expiration time updated successfully.");
+          return; // Salir del bucle después de actualizar
+        }
+      }
+
+      res.status(404).send("Car ID not found in parkedCars.");
+    } else {
+      res.status(404).send("No cars found in parkedCars.");
+    }
+  } catch (error) {
+    console.error("Error updating expiration time:", error);
+    res.status(500).send("Internal server error.");
+  }
+});
 
 app.get("/getUserData/:userId", async (req, res) => {
   const { userId } = req.params;
