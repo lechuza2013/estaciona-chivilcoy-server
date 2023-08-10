@@ -1,12 +1,12 @@
-import { realtimeDB, firestoreDB } from "./db";
+import { realtimeDB, firestoreDB, authDB } from "./db";
 import * as express from "express";
 import * as bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
 import * as cors from "cors";
-import { getMerchantOrder } from "./db";
+import "./stripe";
 
-const app = express();
-const PORT = 8080;
+export const app = express();
+export const PORT = 8080;
 
 app.use(express.json());
 app.use(cors());
@@ -24,6 +24,7 @@ app.use((req, res, next) => {
 });
 
 const platesCollectionRef = firestoreDB.collection("carPlate");
+const dniCollectionRef = firestoreDB.collection("documentNumber");
 
 async function getExpiredCarIds(objetos) {
   const currentDate = new Date();
@@ -65,12 +66,15 @@ async function getExpiredCarIds(objetos) {
           }
         });
       } catch (error) {
-        console.error("Error al actualizar el estado del auto:", error);
+        console.log(
+          "Error al actualizar el estado del auto, probablemente se acaba de borrar un usuario",
+          error
+        );
       }
     }
   }
 }
-
+// Escucha constante de los parkedCars
 (async () => {
   const rtdbRef = realtimeDB.ref("/parkedCars/");
   rtdbRef.on("value", (snap) => {
@@ -83,6 +87,229 @@ async function getExpiredCarIds(objetos) {
   });
 })();
 
+// PROFILES
+app.post("/changePassword", async (req, res) => {
+  const { userId, newPassword } = req.body;
+  if (!userId || !newPassword) {
+    res.json({ message: "Faltan datos" });
+  } else {
+    if (newPassword < 6) {
+      res.json({ message: "La contraseña debe tener minimo 6 caracteres" });
+    }
+    try {
+      await authDB.updateUser(userId, {
+        password: newPassword,
+      });
+      res.status(200).json({ message: "Contraseña cambiada exitosamente" });
+    } catch (err) {
+      res.json({ Error: err });
+    }
+  }
+});
+app.post("/resetPassword", async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    res.json({ message: "Falta el email" });
+  }
+  try {
+    const resetLink = await authDB.generatePasswordResetLink(email);
+
+    res.json({ resetLink });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+// app.delete("/deleteUser/:userId", async (req, res) => {
+//   let updatedData;
+//   const userRef = realtimeDB.ref("/users/");
+//   const { userId } = req.params;
+//   if (!userId) {
+//     res.json({ message: "Falta userId" });
+//   } else {
+//     try {
+//       // Debe chequear si tiene un auto estacionado antes de borrar.
+//       userRef
+//         .get()
+//         .then((currentUserSnap) => {
+//           var currentData = currentUserSnap.val();
+//           if (currentData[userId].cars) {
+//             for (let propiedad in currentData[userId].cars) {
+//               console.log({ propiedad });
+
+//               if (currentData[userId].cars[propiedad].isParked === true) {
+//                 res.status(409).json({
+//                   message:
+//                     "No puedes borrar la cuenta si tienes autos estacionados",
+//                 });
+//               }
+//             }
+//           }
+//           delete currentData[userId];
+//           updatedData = currentData;
+//         })
+//         .then(async () => {
+//           await userRef.update(updatedData);
+//         })
+//         .then(async () => {
+//           await authDB.deleteUser(userId).then(() => {});
+//           res.status(200).json({ message: "Usuario eliminado exitosamente" });
+//         });
+//     } catch (err) {
+//       res
+//         .status(500)
+//         .json({ error: "Error al eliminar el usuario, chequear userId" });
+//     }
+//   }
+// });
+app.delete("/deleteUser/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ message: "Falta userId" });
+    }
+
+    const userRef = realtimeDB.ref(`/users/${userId}`);
+    const userSnapshot = await userRef.once("value");
+    const userData = userSnapshot.val();
+
+    if (userData && userData.cars) {
+      for (const carId in userData.cars) {
+        const car = userData.cars[carId];
+
+        if (car.isParked === true) {
+          return res.status(409).send({
+            message: "No puedes borrar la cuenta si tienes autos estacionados",
+          });
+        }
+      }
+    }
+
+    await userRef.remove();
+    await authDB.deleteUser(userId);
+
+    res.status(200).json({ message: "Usuario eliminado exitosamente" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al eliminar el usuario" });
+  }
+});
+app.post("/signup", async (req, res) => {
+  const { email, userName, password, dni } = req.body;
+
+  console.log("req.body, ", req.body);
+  let userDniData;
+
+  if (!email || !userName || !password || !dni) {
+    res.send({ message: "Faltan datos" });
+  } else if (password.length < 6) {
+    res.send({ message: "Contraseña menor a 6" });
+  } else {
+    try {
+      await dniCollectionRef
+        .doc(dni.toString())
+        .get()
+        .then(async (searchResponse) => {
+          let exists;
+          if (searchResponse.exists) {
+            const usersSnapshot = await realtimeDB.ref("users").once("value");
+            const users = usersSnapshot.val();
+
+            for (const userId in users) {
+              if (users.hasOwnProperty(userId) && users[userId][dni]) {
+                exists = true;
+              }
+            }
+
+            // Si ya esta en uso...
+            if (exists === true) {
+              res.send({ message: "El DNI ya esta en uso" });
+            } else {
+              // SI NO ESTA EN USO:
+              try {
+                const userRecord = await authDB.createUser({
+                  email: email,
+                  password: password,
+                });
+
+                const userRTDBRef = realtimeDB.ref("users/" + userRecord.uid);
+                userDniData = searchResponse.data();
+                console.log({ userDniData });
+                userRTDBRef.set({
+                  [dni]: {
+                    ...userDniData,
+                  },
+                });
+
+                res.json({ message: "Usuario creado!" });
+              } catch (authError) {
+                if (authError.code === "auth/email-already-exists") {
+                  res.send({ message: "Este email ya ha sido usado" });
+                } else {
+                  console.error("Error al crear el usuario:", authError);
+                  res
+                    .status(500)
+                    .send({ message: "Error al crear el usuario" });
+                }
+              }
+            }
+            //TERMINA EL IF (searchResponse.exists)
+          } else {
+            res.send({ message: "DNI Inexistente" });
+          }
+        });
+    } catch (error) {
+      console.error("Error al buscar el DNI:", error);
+      res.status(500).send({ message: "Error al buscar el DNI" });
+    }
+  }
+});
+//Traer los datos del usuario, a partir del userId y busca su DNI
+app.get("/getUserData/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) {
+      return res.json({ message: "Falta userId" });
+    }
+
+    const userRefRTDB = realtimeDB.ref("/users/" + userId);
+    const dataSnapshot = await userRefRTDB.get();
+    const currentData = dataSnapshot.val();
+    console.log(currentData);
+    let DNIfinded;
+    for (const key in currentData) {
+      const userData = currentData[key]; // Obtener el objeto de usuario
+      if (
+        currentData.hasOwnProperty(key) &&
+        typeof userData === "object" &&
+        userData.birth !== undefined &&
+        userData.name !== undefined &&
+        userData.nationality !== undefined &&
+        userData.sex !== undefined &&
+        userData.surname !== undefined
+      ) {
+        DNIfinded = key;
+        break; // Detenemos el bucle una vez que encontramos la clave
+      }
+    }
+
+    if (DNIfinded) {
+      // Encontrar el dni en la firestore con la Key encontrada
+      const userDataSnapshot = await dniCollectionRef.doc(DNIfinded).get();
+      const userData = userDataSnapshot.data();
+      return res.json(userData);
+    } else {
+      return res.json({ message: "No se encontró el DNI" });
+    }
+  } catch (error) {
+    console.error("Error al obtener los datos del usuario:", error);
+    return res
+      .status(500)
+      .json({ error: "Error al obtener los datos del usuario" });
+  }
+});
+
+// CARS
 app.post("/addTime/:carId/:time", async (req, res) => {
   // Recibe el carId para buscarlo en la RTDB, y al encontrarlo, extrae el expiration time y le agrega el tiempo agregado
   const { carId, time } = req.params;
@@ -135,8 +362,8 @@ app.post("/addTime/:carId/:time", async (req, res) => {
     res.status(500).send("Internal server error.");
   }
 });
-
-app.get("/getUserData/:userId", async (req, res) => {
+// Traer los datos de los autos
+app.get("/getUserCars/:userId", async (req, res) => {
   const { userId } = req.params;
   const userRef = realtimeDB.ref("users/" + userId);
 
@@ -381,24 +608,13 @@ app.delete("/deleteCar", (req, res) => {
 // Este webhook recibe 2 peticiones, la que se necesita para saber el
 // order_status es el que tiene el topic: "merchant_order" en el query
 app.post("/webhook/mercadopago", async (req, res) => {
-  const { id, topic } = req.query;
-  try {
-    console.log(
-      "SOY EL WEBHOOK/MERCADOPAGO ",
-      "req.body: ",
-      req.body,
-      "req.query: ",
-      req.query
-    );
-    if (topic == "merchant_order") {
-      const order = await getMerchantOrder(Number(id));
-      console.log({ order });
-      res.send("ok");
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Internal Server Error");
-  }
+  console.log("Webhook QUERY: ", req.query);
+  console.log("Webhook BODY: ", req.body);
+  console.log({
+    Payment: req.query.payment_id,
+    Status: req.query.status,
+    MerchantOrder: req.query.merchant_order_id,
+  });
 });
 
 app.get("/", function (req, res) {
