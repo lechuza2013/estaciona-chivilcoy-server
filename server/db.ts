@@ -12,7 +12,7 @@ const firestoreDB = admin.firestore();
 const realtimeDB = admin.database();
 const authDB = admin.auth();
 
-export { firestoreDB, realtimeDB };
+export { firestoreDB, realtimeDB, authDB};
 
 mercadopago.configure({
   access_token: process.env.ACCESS_TOKEN,
