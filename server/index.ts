@@ -492,7 +492,7 @@ app.post("/parkCar", (req, res) => {
       });
   }
 });
-
+// Crear auto y agregarlo
 app.post("/createCar", (req, res) => {
   let randomId = uuidv4();
   const { carName, plate, userId } = req.body;
@@ -561,7 +561,7 @@ app.post("/createCar", (req, res) => {
       });
   }
 });
-
+//Obtener autos estacionados, y en cuyo caso de ser el Officer, obtenerlos todos
 app.get("/parkedCars/:userId/:isOfficer?", async (req, res) => {
   const { userId, isOfficer } = req.params;
   let isOfficerBoolean;
@@ -631,6 +631,7 @@ app.get("/parkedCars/:userId/:isOfficer?", async (req, res) => {
     res.status(500).send("Internal server error.");
   }
 });
+//Eliminar auto
 app.delete("/deleteCar", (req, res) => {
   const { userId, carId } = req.body;
   console.log("/deleteCar recibió: ", req.body);
@@ -705,8 +706,6 @@ app.delete("/deleteOfficer/:officerId", async (req, res) => {
     }
   }
 });
-//Editar
-// app.put("/editUser/:userId", async (req, res) => {});
 
 // TRAE TODOS LOS PATRULLEROS
 app.get("/getAllOfficers", async (req, res) => {
@@ -723,7 +722,10 @@ app.get("/getAllOfficers", async (req, res) => {
     res.json(officerUsers);
   });
 });
+//Editar
+// app.put("/editUser/:userId", async (req, res) => {});
 
+// ------------------------------------------------------------
 app.get("/", function (req, res) {
   res.send("el servidor de estaciona chivilcoy funciona!");
 });
