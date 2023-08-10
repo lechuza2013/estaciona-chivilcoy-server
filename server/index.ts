@@ -1,4 +1,4 @@
-import { realtimeDB, firestoreDB, authDB, getMerchantOrder } from "./db";
+import { realtimeDB, firestoreDB, authDB } from "./db";
 import * as express from "express";
 import * as bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
@@ -22,8 +22,8 @@ app.use((req, res, next) => {
   next();
 });
 
-const platesCollectionRef = firestoreDB.collection("carPlate");
-const dniCollectionRef = firestoreDB.collection("documentNumber");
+export const platesCollectionRef = firestoreDB.collection("carPlate");
+export const dniCollectionRef = firestoreDB.collection("documentNumber");
 
 function calcularDiferenciaEdad(fechaNacimiento: string): number {
   const fechaNacimientoObj = new Date(fechaNacimiento);
@@ -650,36 +650,9 @@ app.delete("/deleteCar", (req, res) => {
     });
 });
 
-/* MERCADO PAGO */
-// Este webhook recibe 2 peticiones, la que se necesita para saber el
-// order_status es el que tiene el topic: "merchant_order" en el query
-app.post("/webhook/mercadopago", async (req, res) => {
-  const { id, topic } = req.query;
-  try {
-    console.log(
-      "SOY EL WEBHOOK/MERCADOPAGO ",
-      "req.body: ",
-      req.body,
-      "req.query: ",
-      req.query
-    );
-    if (topic == "merchant_order") {
-      const order = await getMerchantOrder(Number(id));
-      console.log({ order });
-      res.send({ order });
-    } else if (topic == "payment") {
-      const order = await getMerchantOrder(req.body.data.id);
-      console.log({ order });
-      res.send({ order });
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Internal Server Error");
-  }
-});
-// BLOQUE BACKOFFICE
+// -------------------- BACKOFFICE --------------------
 
-// 1 -PODER CREAR Y ELIMINAR UN PATRULLERO (SIN DNI)
+// CREAR OFFICER
 app.post("/createOfficer", async (req, res) => {
   const { email, password } = req.body;
   console.log("req.body, ", req.body);
@@ -714,6 +687,7 @@ app.post("/createOfficer", async (req, res) => {
     }
   }
 });
+// BORRAR OFFICER
 app.delete("/deleteOfficer/:officerId", async (req, res) => {
   const { officerId } = req.params;
   if (!officerId) {
@@ -731,14 +705,10 @@ app.delete("/deleteOfficer/:officerId", async (req, res) => {
     }
   }
 });
-// 2 -MOSTRAR TODOS LOS USUARIOS (GET), PODER EDITARLOS (PUT), O BORRARLOS(DELETE)
-// Duda, del RTDB + DNI ?
+//Editar
+// app.put("/editUser/:userId", async (req, res) => {});
 
-app.put("/editUser/:userId", async (req, res) => {});
-// 3- OBTENER PAGOS REALIZADOS, ALMACENADOS EN LA FIRESTORE
-// ---> Faltan los pagos en la firestore
-
-// 4- TRARE TODOS LOS PATRULLEROS
+// TRAE TODOS LOS PATRULLEROS
 app.get("/getAllOfficers", async (req, res) => {
   const usersRef = realtimeDB.ref("/users/");
   usersRef.get().then((snap) => {
@@ -753,9 +723,7 @@ app.get("/getAllOfficers", async (req, res) => {
     res.json(officerUsers);
   });
 });
-app.post;
 
-// BLOQUE BACKOFFICE
 app.get("/", function (req, res) {
   res.send("el servidor de estaciona chivilcoy funciona!");
 });
@@ -763,3 +731,31 @@ app.get("/", function (req, res) {
 app.listen(PORT, () => {
   console.log("API running at ", PORT);
 });
+
+/* MERCADO PAGO */
+// Este webhook recibe 2 peticiones, la que se necesita para saber el
+// order_status es el que tiene el topic: "merchant_order" en el query
+// app.post("/webhook/mercadopago", async (req, res) => {
+//   const { id, topic } = req.query;
+//   try {
+//     console.log(
+//       "SOY EL WEBHOOK/MERCADOPAGO ",
+//       "req.body: ",
+//       req.body,
+//       "req.query: ",
+//       req.query
+//     );
+//     if (topic == "merchant_order") {
+//       const order = await getMerchantOrder(Number(id));
+//       console.log({ order });
+//       res.send({ order });
+//     } else if (topic == "payment") {
+//       const order = await getMerchantOrder(req.body.data.id);
+//       console.log({ order });
+//       res.send({ order });
+//     }
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).send("Internal Server Error");
+//   }
+// });
