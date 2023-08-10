@@ -1,30 +1,15 @@
 // CONEXIÓN A LA DATABASE
-const admin = require("firebase-admin");
+import admin from "firebase-admin";
+import * as serviceAccount from "../key.json";
 // Mercadopago
-const mercadopago = require('mercadopago');
 
 admin.initializeApp({
-  credential: admin.credential.cert(JSON.parse(process.env.SERVICE_ACCOUNT)),
-  databaseURL: process.env.FIREBASE_DB_URL,
+  credential: admin.credential.cert(serviceAccount as any),
+  databaseURL: "https://estaciona-chivilcoy-37816-default-rtdb.firebaseio.com",
 });
 
 const firestoreDB = admin.firestore();
 const realtimeDB = admin.database();
 const authDB = admin.auth();
 
-export { firestoreDB, realtimeDB, authDB};
-
-mercadopago.configure({
-  access_token: process.env.ACCESS_TOKEN,
-});
-
-export async function getMerchantOrder(id) {
-  console.log("Soy la function getMerchantOrder", id);
-  try {
-    const res = await mercadopago.merchant_orders.get(id);
-
-    return res.body.order_status;
-  } catch (err) {
-    return err;
-  }
-}
+export { firestoreDB, realtimeDB, authDB };
