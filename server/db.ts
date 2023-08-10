@@ -1,11 +1,9 @@
 // CONEXIÓN A LA DATABASE
 import admin from "firebase-admin";
-import * as serviceAccount from "../key.json";
-// Mercadopago
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount as any),
-  databaseURL: "https://estaciona-chivilcoy-37816-default-rtdb.firebaseio.com",
+  credential: admin.credential.cert(JSON.parse(process.env.SERVICE_ACCOUNT)),
+  databaseURL: process.env.FIREBASE_DB_URL,
 });
 
 const firestoreDB = admin.firestore();
