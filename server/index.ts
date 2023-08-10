@@ -1,12 +1,20 @@
-import { realtimeDB, firestoreDB, authDB } from "./db";
+import {
+  realtimeDB,
+  firestoreDB,
+  authDB,
+  dniCollectionRef,
+  platesCollectionRef,
+} from "./db";
 import * as express from "express";
 import * as bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
 import * as cors from "cors";
 
+// Importar enrutadores
+
 export const app = express();
 export const PORT = 8080;
-
+// export const router = express.Router();
 app.use(express.json());
 app.use(cors());
 app.use(bodyParser.json());
@@ -21,9 +29,6 @@ app.use((req, res, next) => {
   );
   next();
 });
-
-export const platesCollectionRef = firestoreDB.collection("carPlate");
-export const dniCollectionRef = firestoreDB.collection("documentNumber");
 
 function calcularDiferenciaEdad(fechaNacimiento: string): number {
   const fechaNacimientoObj = new Date(fechaNacimiento);
@@ -102,7 +107,7 @@ async function getExpiredCarIds(objetos) {
     isProcessing = false; // Restablecer el indicador después de que la función haya terminado
   }
 }
-
+// Escucha a tiempo real
 (async () => {
   const rtdbRef = realtimeDB.ref("/parkedCars/");
   rtdbRef.on("value", (snap) => {
@@ -734,30 +739,30 @@ app.listen(PORT, () => {
   console.log("API running at ", PORT);
 });
 
-/* MERCADO PAGO */
+// /* MERCADO PAGO */
 // Este webhook recibe 2 peticiones, la que se necesita para saber el
 // order_status es el que tiene el topic: "merchant_order" en el query
-// app.post("/webhook/mercadopago", async (req, res) => {
-//   const { id, topic } = req.query;
-//   try {
-//     console.log(
-//       "SOY EL WEBHOOK/MERCADOPAGO ",
-//       "req.body: ",
-//       req.body,
-//       "req.query: ",
-//       req.query
-//     );
-//     if (topic == "merchant_order") {
-//       const order = await getMerchantOrder(Number(id));
-//       console.log({ order });
-//       res.send({ order });
-//     } else if (topic == "payment") {
-//       const order = await getMerchantOrder(req.body.data.id);
-//       console.log({ order });
-//       res.send({ order });
-//     }
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).send("Internal Server Error");
-//   }
-// });
+app.post("/webhook/mercadopago", async (req, res) => {
+  const { id, topic } = req.query;
+  try {
+    console.log(
+      "SOY EL WEBHOOK/MERCADOPAGO ",
+      "req.body: ",
+      req.body,
+      "req.query: ",
+      req.query
+    );
+    if (topic == "merchant_order") {
+      const order = await getMerchantOrder(Number(id));
+      console.log({ order });
+      res.send({ order });
+    } else if (topic == "payment") {
+      const order = await getMerchantOrder(req.body.data.id);
+      console.log({ order });
+      res.send({ order });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Internal Server Error");
+  }
+});
