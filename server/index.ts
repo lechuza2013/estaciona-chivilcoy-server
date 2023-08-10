@@ -1,8 +1,9 @@
-import { realtimeDB, firestoreDB, authDB } from "./db";
+import { realtimeDB, firestoreDB, authDB, getMerchantOrder } from "./db";
 import * as express from "express";
 import * as bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
 import * as cors from "cors";
+import "./stripe";
 
 export const app = express();
 export const PORT = 8080;
@@ -13,7 +14,7 @@ app.use(bodyParser.json());
 app.use((req, res, next) => {
   res.setHeader(
     "Access-Control-Allow-Origin",
-    "https://chivilcoy-estaciona.onrender.com"
+    "https://estaciona-chivilcoy-j9mv.onrender.com"
   );
   res.header(
     "Access-Control-Allow-Headers",
@@ -607,13 +608,28 @@ app.delete("/deleteCar", (req, res) => {
 // Este webhook recibe 2 peticiones, la que se necesita para saber el
 // order_status es el que tiene el topic: "merchant_order" en el query
 app.post("/webhook/mercadopago", async (req, res) => {
-  console.log("Webhook QUERY: ", req.query);
-  console.log("Webhook BODY: ", req.body);
-  console.log({
-    Payment: req.query.payment_id,
-    Status: req.query.status,
-    MerchantOrder: req.query.merchant_order_id,
-  });
+  const { id, topic } = req.query;
+  try {
+    console.log(
+      "SOY EL WEBHOOK/MERCADOPAGO ",
+      "req.body: ",
+      req.body,
+      "req.query: ",
+      req.query
+    );
+    if (topic == "merchant_order") {
+      const order = await getMerchantOrder(Number(id));
+      console.log({ order });
+      res.send({ order });
+    } else if (topic == "payment") {
+      const order = await getMerchantOrder(req.body.data.id);
+      console.log({ order });
+      res.send({ order });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Internal Server Error");
+  }
 });
 
 app.get("/", function (req, res) {
