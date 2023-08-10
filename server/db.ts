@@ -10,6 +10,7 @@ admin.initializeApp({
 
 const firestoreDB = admin.firestore();
 const realtimeDB = admin.database();
+const authDB = admin.auth();
 
 export { firestoreDB, realtimeDB };
 
