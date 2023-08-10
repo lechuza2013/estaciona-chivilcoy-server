@@ -25,68 +25,97 @@ app.use((req, res, next) => {
 const platesCollectionRef = firestoreDB.collection("carPlate");
 const dniCollectionRef = firestoreDB.collection("documentNumber");
 
-async function getExpiredCarIds(objetos) {
-  const currentDate = new Date();
+function calcularDiferenciaEdad(fechaNacimiento: string): number {
+  const fechaNacimientoObj = new Date(fechaNacimiento);
+  const fechaActual = new Date();
 
-  const expiredCarIds = Object.keys(objetos).filter((key) => {
-    const expirationTime = new Date(objetos[key].expirationTime);
-    return expirationTime < currentDate;
-  });
+  const diferenciaMilisegundos =
+    fechaActual.getTime() - fechaNacimientoObj.getTime();
+  const milisegundosEnUnAño = 1000 * 60 * 60 * 24 * 365.25; // Considerando años bisiestos
 
-  console.log(expiredCarIds);
+  const diferenciaAños = diferenciaMilisegundos / milisegundosEnUnAño;
 
-  if (expiredCarIds.length > 0) {
-    for (const carId of expiredCarIds) {
-      const userId = objetos[carId].userId;
-      const realCarId = objetos[carId].carId;
-      const userCarIdRef = realtimeDB.ref("users/");
+  return Math.floor(diferenciaAños);
+}
+let isProcessing = false;
 
-      console.log("UserID: ", userId, "carId: ", realCarId);
-      try {
-        await realtimeDB
-          .ref(`/parkedCars/${carId}`)
-          .remove()
-          .then(() => {
-            console.log("Auto removido");
-          });
-        await userCarIdRef.get().then((currentSnap) => {
-          var csData = currentSnap.val();
-          console.log(csData);
-          if (csData[userId].cars[realCarId].isParked === true) {
-            csData[userId].cars[realCarId].isParked = false;
-            userCarIdRef.update(csData);
-            console.log(
-              "isParked del auto :",
-              csData[userId].cars[realCarId].name,
-              "Seteado a 'false'"
-            );
-          } else if (csData[userId].cars[realCarId].isParked === false) {
-            console.log("isParked ya es false, chequear funcionamiento");
-          }
-        });
-      } catch (error) {
+async function removeExpiredCar(carId, userId, realCarId, objetos) {
+  try {
+    await realtimeDB.ref(`/parkedCars/${carId}`).remove();
+    const userCarIdRef = realtimeDB.ref(`/users/${userId}`);
+    const currentSnap = await userCarIdRef.get();
+    const csData = currentSnap.val();
+
+    if (csData && csData.cars && csData.cars[realCarId]) {
+      if (csData.cars[realCarId].isParked) {
+        csData.cars[realCarId].isParked = false;
+        await userCarIdRef.update(csData);
         console.log(
-          "Error al actualizar el estado del auto, probablemente se acaba de borrar un usuario",
-          error
+          `isParked del auto "${csData.cars[realCarId].name}" seteado a 'false'`
+        );
+      } else {
+        console.log(
+          `isParked ya es false para el auto "${csData.cars[realCarId].name}"`
         );
       }
     }
+
+    // Eliminar el automóvil del objeto objetos
+    delete objetos[carId];
+  } catch (error) {
+    console.log(`Error al actualizar el estado del auto: ${error}`);
   }
 }
-// Escucha constante de los parkedCars
+
+async function getExpiredCarIds(objetos) {
+  if (isProcessing) {
+    return; // Evitar que se ejecute nuevamente mientras aún está en proceso
+  }
+
+  isProcessing = true;
+
+  try {
+    const currentDate = new Date();
+    const expiredCarIds = Object.keys(objetos).filter((key) => {
+      const expirationTime = new Date(objetos[key].expirationTime);
+      console.log("Fecha de expiración:", expirationTime); // Agregado para depuración
+      return expirationTime < currentDate;
+    });
+
+    console.log("IDs de autos expirados:", expiredCarIds);
+
+    if (expiredCarIds.length > 0) {
+      await Promise.all(
+        expiredCarIds.map(async (carId) => {
+          const userId = objetos[carId].userId;
+          const realCarId = objetos[carId].carId;
+          console.log("Removiendo automóvil:", carId); // Agregado para depuración
+          console.log("userId:", userId); // Agregado para depuración
+          console.log("realCarId:", realCarId); // Agregado para depuración
+          await removeExpiredCar(carId, userId, realCarId, objetos);
+        })
+      );
+    }
+  } catch (error) {
+    console.log(`Error en getExpiredCarIds: ${error}`);
+  } finally {
+    isProcessing = false; // Restablecer el indicador después de que la función haya terminado
+  }
+}
+
 (async () => {
   const rtdbRef = realtimeDB.ref("/parkedCars/");
   rtdbRef.on("value", (snap) => {
-    let data = snap.val();
-    //Para que no aparezca el prueba: 1 que esta en al database
-    delete data.prueba;
-    const intervalId = setInterval(() => {
+    const data = snap.val();
+    delete data.no;
+    console.log(data);
+    setInterval(() => {
       getExpiredCarIds(data);
     }, 30000);
   });
 })();
 
-// PROFILES
+// -------------------- PROFILES --------------------
 app.post("/changePassword", async (req, res) => {
   const { userId, newPassword } = req.body;
   if (!userId || !newPassword) {
@@ -225,30 +254,40 @@ app.post("/signup", async (req, res) => {
               res.send({ message: "El DNI ya esta en uso" });
             } else {
               // SI NO ESTA EN USO:
-              try {
-                const userRecord = await authDB.createUser({
-                  email: email,
-                  password: password,
+              // !SI ES MAYOR A 16 AÑOS
+              let birth = searchResponse.data().birth;
+              let ageDiff = calcularDiferenciaEdad(birth);
+              if (ageDiff < 16) {
+                res.json({
+                  message:
+                    "Un menor de edad no puede registrarse, ni conducir.",
                 });
+              } else {
+                try {
+                  const userRecord = await authDB.createUser({
+                    email: email,
+                    password: password,
+                  });
 
-                const userRTDBRef = realtimeDB.ref("users/" + userRecord.uid);
-                userDniData = searchResponse.data();
-                console.log({ userDniData });
-                userRTDBRef.set({
-                  [dni]: {
-                    ...userDniData,
-                  },
-                });
+                  const userRTDBRef = realtimeDB.ref("users/" + userRecord.uid);
+                  userDniData = searchResponse.data();
+                  console.log({ userDniData });
+                  userRTDBRef.set({
+                    [dni]: {
+                      ...userDniData,
+                    },
+                  });
 
-                res.json({ message: "Usuario creado!" });
-              } catch (authError) {
-                if (authError.code === "auth/email-already-exists") {
-                  res.send({ message: "Este email ya ha sido usado" });
-                } else {
-                  console.error("Error al crear el usuario:", authError);
-                  res
-                    .status(500)
-                    .send({ message: "Error al crear el usuario" });
+                  res.json({ message: "Usuario creado!" });
+                } catch (authError) {
+                  if (authError.code === "auth/email-already-exists") {
+                    res.send({ message: "Este email ya ha sido usado" });
+                  } else {
+                    console.error("Error al crear el usuario:", authError);
+                    res
+                      .status(500)
+                      .send({ message: "Error al crear el usuario" });
+                  }
                 }
               }
             }
@@ -308,7 +347,7 @@ app.get("/getUserData/:userId", async (req, res) => {
   }
 });
 
-// CARS
+// -------------------- CARS --------------------
 app.post("/addTime/:carId/:time", async (req, res) => {
   // Recibe el carId para buscarlo en la RTDB, y al encontrarlo, extrae el expiration time y le agrega el tiempo agregado
   const { carId, time } = req.params;
@@ -422,23 +461,24 @@ app.post("/parkCar", (req, res) => {
       .get()
       .then((snap) => {
         const allData = snap.val();
+        console.log({ allData });
         //Busca la info del auto para guardarlas en el string declarado anteriormente
         carData = allData.users[userId].cars[carId];
 
-        // Update the 'isParked' property to true in the user's car entry
-        realtimeDB.ref(`/users/${userId}/cars/${carId}`).update({
-          isParked: true,
-        });
-
-        //Setea en "/parkedCars", los siguientes datos
-        return realtimeDB.ref("/parkedCars/" + uuidv4()).set({
+        // Setea isParked en "true", al auto correspondiente
+        allData.users[userId].cars[carId].isParked = true;
+        // Toda la data del nuevo auto estacionado
+        allData.parkedCars[uuidv4()] = {
           carId: carId,
           coordinates: coordinates,
           userId: userId,
           name: carData.name,
           expirationTime: expirationTime.toString(),
           plate: plate,
-        });
+        };
+        //Actualiza toda la data a la RTDB
+        console.log(allData);
+        rtdbData.update(allData);
       })
       .then(() => {
         res.json({
@@ -469,44 +509,51 @@ app.post("/createCar", (req, res) => {
       .get()
       .then((doc) => {
         if (doc.exists) {
-          rtdbRef
-            .get()
-            .then((currentDataSnap) => {
-              let currentDataSnapData = currentDataSnap.val();
-              // Si existe un "/cars/, lo agrega a .cars", pero primero chequea si ya tiene otro auto con la misma patente
-              if (currentDataSnapData.cars) {
-                Object.assign(currentDataSnapData.cars, {
+          rtdbRef.get().then((currentDataSnap) => {
+            let currentDataSnapData = currentDataSnap.val();
+            // Si existe un "/cars/, lo agrega a .cars", pero primero chequea si ya tiene otro auto con la misma patente
+            if (currentDataSnapData.cars) {
+              //Chequear plates repetidas
+              for (let car in currentDataSnapData.cars) {
+                if (currentDataSnapData.cars[car].plate == plate) {
+                  return res.json({
+                    message: "Ya hay un auto con esta patente",
+                  });
+                }
+              }
+              Object.assign(currentDataSnapData.cars, {
+                [randomId]: {
+                  expirationTime: "",
+                  isParked: false,
+                  name: carName,
+                  plate: plate,
+                },
+              });
+              rtdbRef.update(currentDataSnapData).then(() => {
+                res.json({
+                  message: "Auto agregado!",
+                });
+              });
+            } else {
+              // Si no existe, lo agrega,
+              Object.assign(currentDataSnapData, {
+                cars: {
                   [randomId]: {
                     expirationTime: "",
                     isParked: false,
                     name: carName,
                     plate: plate,
                   },
-                });
-                rtdbRef.update(currentDataSnapData);
-              } else {
-                // Si no existe, lo agrega,
-                Object.assign(currentDataSnapData, {
-                  cars: {
-                    [randomId]: {
-                      expirationTime: "",
-                      isParked: false,
-                      name: carName,
-                      plate: plate,
-                    },
-                  },
-                });
-                rtdbRef.update(currentDataSnapData);
-              }
-            })
-            .then(() => {
-              console.log("Auto agregado");
-              res.json({
-                message: "Auto agregado!",
+                },
               });
-            });
+              rtdbRef.update(currentDataSnapData).then(() => {
+                res.json({
+                  message: "Auto agregado!",
+                });
+              });
+            }
+          });
         } else {
-          console.log("Pantente error");
           res
             .status(401)
             .send({ message: "Numero de patente incorrecto o inexistente" });
@@ -630,7 +677,85 @@ app.post("/webhook/mercadopago", async (req, res) => {
     res.status(500).send("Internal Server Error");
   }
 });
+// BLOQUE BACKOFFICE
 
+// 1 -PODER CREAR Y ELIMINAR UN PATRULLERO (SIN DNI)
+app.post("/createOfficer", async (req, res) => {
+  const { email, password } = req.body;
+  console.log("req.body, ", req.body);
+
+  if (!email || !password) {
+    res.send({ message: "Faltan datos" });
+  } else if (password.length < 6) {
+    res.send({ message: "Contraseña menor a 6" });
+  } else {
+    try {
+      // SI NO ESTA EN USO:
+      // !SI ES MAYOR A 16 AÑOS
+
+      const userRecord = await authDB.createUser({
+        email: email,
+        password: password,
+      });
+      const userRTDBRef = realtimeDB.ref("users/" + userRecord.uid);
+
+      userRTDBRef.set({
+        isOfficer: true,
+      });
+
+      res.json({ message: "Oficial creado!" });
+    } catch (authError) {
+      if (authError.code === "auth/email-already-exists") {
+        res.send({ message: "Este email ya ha sido usado" });
+      } else {
+        console.error("Error al crear el usuario:", authError);
+        res.status(500).send({ message: "Error al crear el usuario" });
+      }
+    }
+  }
+});
+app.delete("/deleteOfficer/:officerId", async (req, res) => {
+  const { officerId } = req.params;
+  if (!officerId) {
+    res.json({ message: "Falta el officerId" });
+  } else {
+    const officerRefRTDB = realtimeDB.ref("/users/" + officerId);
+
+    try {
+      await officerRefRTDB.remove();
+      await authDB.deleteUser(officerId);
+
+      res.json({ message: "Oficial eliminado" });
+    } catch (err) {
+      console.error("Error: ", err);
+    }
+  }
+});
+// 2 -MOSTRAR TODOS LOS USUARIOS (GET), PODER EDITARLOS (PUT), O BORRARLOS(DELETE)
+// Duda, del RTDB + DNI ?
+
+app.put("/editUser/:userId", async (req, res) => {});
+// 3- OBTENER PAGOS REALIZADOS, ALMACENADOS EN LA FIRESTORE
+// ---> Faltan los pagos en la firestore
+
+// 4- TRARE TODOS LOS PATRULLEROS
+app.get("/getAllOfficers", async (req, res) => {
+  const usersRef = realtimeDB.ref("/users/");
+  usersRef.get().then((snap) => {
+    let allUsers = snap.val();
+    let officerUsers = {};
+    for (const id in allUsers) {
+      const objeto = allUsers[id];
+      if (objeto.hasOwnProperty("isOfficer") && objeto.isOfficer === true) {
+        officerUsers[id] = { isOfficer: true };
+      }
+    }
+    res.json(officerUsers);
+  });
+});
+app.post;
+
+// BLOQUE BACKOFFICE
 app.get("/", function (req, res) {
   res.send("el servidor de estaciona chivilcoy funciona!");
 });
