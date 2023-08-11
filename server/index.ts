@@ -227,7 +227,7 @@ app.delete("/deleteUser/:userId", async (req, res) => {
     res.status(500).json({ error: "Error al eliminar el usuario" });
   }
 });
-app.post("/signup", async (req, res) => {
+app.post("/register", async (req, res) => {
   const { email, userName, password, dni } = req.body;
 
   console.log("req.body, ", req.body);
@@ -272,6 +272,7 @@ app.post("/signup", async (req, res) => {
                   const userRecord = await authDB.createUser({
                     email: email,
                     password: password,
+                    displayName: userName,
                   });
 
                   const userRTDBRef = realtimeDB.ref("users/" + userRecord.uid);
@@ -340,6 +341,7 @@ app.get("/getUserData/:userId", async (req, res) => {
       // Encontrar el dni en la firestore con la Key encontrada
       const userDataSnapshot = await dniCollectionRef.doc(DNIfinded).get();
       const userData = userDataSnapshot.data();
+      userData.dni = DNIfinded;
       return res.json(userData);
     } else {
       return res.json({ message: "No se encontró el DNI" });
@@ -660,10 +662,10 @@ app.delete("/deleteCar", (req, res) => {
 
 // CREAR OFFICER
 app.post("/createOfficer", async (req, res) => {
-  const { email, password } = req.body;
+  const { email, userName, password } = req.body;
   console.log("req.body, ", req.body);
 
-  if (!email || !password) {
+  if (!email || !password || !userName) {
     res.send({ message: "Faltan datos" });
   } else if (password.length < 6) {
     res.send({ message: "Contraseña menor a 6" });
@@ -679,6 +681,7 @@ app.post("/createOfficer", async (req, res) => {
       const userRTDBRef = realtimeDB.ref("users/" + userRecord.uid);
 
       userRTDBRef.set({
+        name: userName,
         isOfficer: true,
       });
 
@@ -721,14 +724,44 @@ app.get("/getAllOfficers", async (req, res) => {
     for (const id in allUsers) {
       const objeto = allUsers[id];
       if (objeto.hasOwnProperty("isOfficer") && objeto.isOfficer === true) {
-        officerUsers[id] = { isOfficer: true };
+        officerUsers[id] = { isOfficer: true, name: objeto.name };
       }
     }
     res.json(officerUsers);
   });
 });
-//Editar
-// app.put("/editUser/:userId", async (req, res) => {});
+// Registrar la compra en la RTDB
+app.post("/registerPurchase", async (req, res) => {
+  const { date, payment_id, plate, data } = req.body;
+  try {
+    if (!date || !payment_id || !plate || !data) {
+      throw new Error("Faltaron datos a enviar");
+    }
+    const purchasesRTDBRef = realtimeDB.ref("/purchases");
+    purchasesRTDBRef
+      .get()
+      .then((snap) => {
+        let currentData = snap.val();
+        const newPurchaseKey = uuidv4();
+        currentData[newPurchaseKey] = {
+          data: data,
+          payment_id: payment_id,
+          plate: plate,
+          date: date,
+        };
+        return purchasesRTDBRef.update(currentData);
+      })
+      .then(() => {
+        res.json({ message: "Compra registrada!" });
+      })
+      .catch((error) => {
+        throw error;
+      });
+  } catch (error) {
+    console.error("Error:", error.message);
+    res.status(400).json({ error: error.message });
+  }
+});
 
 // ------------------------------------------------------------
 app.get("/", function (req, res) {
@@ -742,27 +775,27 @@ app.listen(PORT, () => {
 // /* MERCADO PAGO */
 // Este webhook recibe 2 peticiones, la que se necesita para saber el
 // order_status es el que tiene el topic: "merchant_order" en el query
-app.post("/webhook/mercadopago", async (req, res) => {
-  const { id, topic } = req.query;
-  try {
-    console.log(
-      "SOY EL WEBHOOK/MERCADOPAGO ",
-      "req.body: ",
-      req.body,
-      "req.query: ",
-      req.query
-    );
-    if (topic == "merchant_order") {
-      const order = await getMerchantOrder(Number(id));
-      console.log({ order });
-      res.send({ order });
-    } else if (topic == "payment") {
-      const order = await getMerchantOrder(req.body.data.id);
-      console.log({ order });
-      res.send({ order });
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Internal Server Error");
-  }
-});
+// app.post("/webhook/mercadopago", async (req, res) => {
+//   const { id, topic } = req.query;
+//   try {
+//     console.log(
+//       "SOY EL WEBHOOK/MERCADOPAGO ",
+//       "req.body: ",
+//       req.body,
+//       "req.query: ",
+//       req.query
+//     );
+//     if (topic == "merchant_order") {
+//       const order = await getMerchantOrder(Number(id));
+//       console.log({ order });
+//       res.send({ order });
+//     } else if (topic == "payment") {
+//       const order = await getMerchantOrder(req.body.data.id);
+//       console.log({ order });
+//       res.send({ order });
+//     }
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).send("Internal Server Error");
+//   }
+// });
